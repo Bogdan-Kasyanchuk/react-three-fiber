@@ -29,7 +29,7 @@
 
 'use client'
 
-import { useRef, useState, Suspense, type RefObject } from 'react'
+import { useRef, useState, Suspense, type Ref } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, RoundedBox } from '@react-three/drei'
 import {
@@ -86,7 +86,7 @@ function Dice({
     bodyRef,
     onSleep,
 }: {
-    bodyRef: RefObject<RapierRigidBody | null>
+    bodyRef: Ref<RapierRigidBody>
     onSleep: () => void
 }) {
     return (
@@ -165,12 +165,14 @@ function getDiceResult(body: RapierRigidBody): number {
 }
 
 export default function DiceScene() {
-    const bodyRefs = useRef<Array<RapierRigidBody>>([])
+    const bodyRefs = useRef<Array<RapierRigidBody | undefined>>([])
     const [result, setResult] = useState<number | null>(null)
 
-    const rollDice = () => {
-        const bodies = bodyRefs.current
+    // Лише змонтовані тіла, без «дірок» від розмонтованих кубиків
+    const getBodies = () => bodyRefs.current.filter(Boolean) as RapierRigidBody[]
 
+    const rollDice = () => {
+        const bodies = getBodies()
         if (!bodies.length) return
 
         setResult(null)
@@ -191,25 +193,30 @@ export default function DiceScene() {
 
             // Випадкове обертання
             body.applyTorqueImpulse({
-                x: (Math.random() - 0.5) * 8,
-                y: (Math.random() - 0.5) * 8,
-                z: (Math.random() - 0.5) * 8,
+                x: (Math.random() - 0.5) * 1,
+                y: (Math.random() - 0.5) * 1,
+                z: (Math.random() - 0.5) * 1,
             }, true)
         })
-
         // Повертаємо кубик у початкову позицію
-
     }
 
     const handleSleep = () => {
-        if (!bodyRef.current) return
+        const bodies = getBodies()
+        if (!bodies.length) return
 
-        setResult(getDiceResult(bodyRef.current))
+        let count = 0
+
+        bodies.forEach((body) => {
+            count += getDiceResult(body)
+        })
+
+        setResult(count)
     }
 
     return (
         <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-            <Canvas camera={{ position: [4, 4, 5], fov: 40 }}>
+            <Canvas camera={{ position: [18, 18, 18], fov: 50 }}>
                 <color attach="background" args={['#20242c']} />
 
                 <ambientLight intensity={1.5} />
@@ -226,11 +233,7 @@ export default function DiceScene() {
                             <Dice
                                 key={index}
                                 bodyRef={(el) => {
-                                    if (el) {
-                                        bodyRefs.current[index] = el;
-                                    } else {
-                                        delete bodyRefs.current[index];
-                                    }
+                                    bodyRefs.current[index] = el ?? undefined
                                 }}
                                 onSleep={handleSleep}
                             />
@@ -240,14 +243,14 @@ export default function DiceScene() {
                         <RigidBody type="fixed" colliders={false}>
                             <CuboidCollider
                                 position={[0, -0.25, 0]}
-                                args={[10, 0.25, 10]}
+                                args={[20, 0.25, 20]}
                             />
 
                             <mesh
                                 position={[0, -0.25, 0]}
                                 receiveShadow
                             >
-                                <boxGeometry args={[20, 0.5, 20]} />
+                                <boxGeometry args={[40, 0.5, 40]} />
                                 <meshStandardMaterial color="#414750" />
                             </mesh>
                         </RigidBody>
