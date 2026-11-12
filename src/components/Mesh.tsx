@@ -1,4 +1,4 @@
-import { OrbitControls, SpotLight } from "@react-three/drei";
+import { OrbitControls, SpotLight, Stats } from "@react-three/drei";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import { useRef } from "react";
 import { useControls } from "leva";
@@ -118,6 +118,7 @@ const Mesh = () => {
             />
             <Boxes />
             <OrbitControls />
+            <Stats />
         </Canvas>
     );
 };

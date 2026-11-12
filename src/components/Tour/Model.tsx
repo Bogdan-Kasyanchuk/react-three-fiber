@@ -16,6 +16,7 @@ type GLTFResult = ObjectMap & {
 
 export default function Model() {
     const { nodes, materials } = useGLTF(modelUrl) as unknown as GLTFResult
+
     return (
         <group dispose={null} position={[0, -2.66, 0]}>
             <mesh castShadow receiveShadow geometry={nodes.Curve007_1.geometry} material={materials['Material.001']} />
