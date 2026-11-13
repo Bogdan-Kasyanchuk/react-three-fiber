@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <title>3D Змійка на Three.js</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #111;
+            font-family: sans-serif;
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px #000;
+        }
+
+        #gameover {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff4757;
+            font-size: 40px;
+            font-weight: bold;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 30px;
+            border-radius: 12px;
+        }
+
+        button {
+            margin-top: 15px;
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            background: #2ed573;
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="ui">Рахунок: <span id="score">0</span></div>
+    <div id="gameover">
+        Гру закінчено!<br>
+        <button onclick="resetGame()">Грати знову</button>
+    </div>
+
+    <!-- Підключення Three.js через CDN -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com"
+      }
+    }
+  </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // 1. Налаштування сцени, камери та рендерера
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1e272e);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 18, 16);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // 2. Освітлення
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // 3. Ігрове поле (сітка 20x20)
+        const GRID_SIZE = 20;
+        const HALF_GRID = GRID_SIZE / 2;
+
+        const planeGeo = new THREE.PlaneGeometry(GRID_SIZE, GRID_SIZE);
+        const planeMat = new THREE.MeshStandardMaterial({ color: 0x2f3542 });
+        const plane = new THREE.Mesh(planeGeo, planeMat);
+        plane.rotation.x = -Math.PI / 2;
+        plane.receiveShadow = true;
+        scene.add(plane);
+
+        const gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_SIZE, 0x57606f, 0x3d4452);
+        gridHelper.position.y = 0.01;
+        scene.add(gridHelper);
+
+        // 4. Змінні стану гри
+        let snake = [];
+        let direction = { x: 1, z: 0 };
+        let nextDirection = { x: 1, z: 0 };
+        let foodMesh;
+        let foodPos = { x: 0, z: 0 };
+        let score = 0;
+        let isGameOver = false;
+        let lastMoveTime = 0;
+        const MOVE_INTERVAL = 300; // Швидкість у мілісекундах
+
+        const boxGeo = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+        const headMat = new THREE.MeshStandardMaterial({ color: 0x2ed573 });
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x7bed9f });
+        const foodMat = new THREE.MeshStandardMaterial({ color: 0xff4757 });
+
+        // 5. Функції ігрової логіки
+        function createSegment(x, z, isHead = false) {
+            const mesh = new THREE.Mesh(boxGeo, isHead ? headMat : bodyMat);
+            mesh.position.set(x + 0.5, 0.45, z + 0.5);
+            mesh.castShadow = true;
+            scene.add(mesh);
+            return { x, z, mesh };
+        }
+
+        function spawnFood() {
+            let valid = false;
+            while (!valid) {
+                foodPos.x = Math.floor(Math.random() * GRID_SIZE) - HALF_GRID;
+                foodPos.z = Math.floor(Math.random() * GRID_SIZE) - HALF_GRID;
+                valid = !snake.some(seg => seg.x === foodPos.x && seg.z === foodPos.z);
+            }
+            if (!foodMesh) {
+                foodMesh = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 16), foodMat);
+                foodMesh.castShadow = true;
+                scene.add(foodMesh);
+            }
+            foodMesh.position.set(foodPos.x + 0.5, 0.45, foodPos.z + 0.5);
+        }
+
+        window.resetGame = function () {
+            snake.forEach(seg => scene.remove(seg.mesh));
+            snake = [];
+            direction = { x: 1, z: 0 };
+            nextDirection = { x: 1, z: 0 };
+            score = 0;
+            isGameOver = false;
+            document.getElementById('score').innerText = score;
+            document.getElementById('gameover').style.display = 'none';
+
+            snake.push(createSegment(0, 0, true));
+            snake.push(createSegment(-1, 0, false));
+            snake.push(createSegment(-2, 0, false));
+            spawnFood();
+        };
+
+        // 6. Керування (Стрілки та WASD)
+        window.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case 'ArrowUp': case 'w': case 'W':
+                    if (direction.z !== 1) nextDirection = { x: 0, z: -1 };
+                    break;
+                case 'ArrowDown': case 's': case 'S':
+                    if (direction.z !== -1) nextDirection = { x: 0, z: 1 };
+                    break;
+                case 'ArrowLeft': case 'a': case 'A':
+                    if (direction.x !== 1) nextDirection = { x: -1, z: 0 };
+                    break;
+                case 'ArrowRight': case 'd': case 'D':
+                    if (direction.x !== -1) nextDirection = { x: 1, z: 0 };
+                    break;
+            }
+        });
+
+        // Адаптація під розмір вікна
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // 7. Головний цикл гри
+        function updateGame() {
+            if (isGameOver) return;
+
+            direction = nextDirection;
+            const head = snake[0];
+            const newX = head.x + direction.x;
+            const newZ = head.z + direction.z;
+
+            // Перевірка зіткнення зі стінами або власним хвостом
+            if (
+                newX < -HALF_GRID || newX >= HALF_GRID ||
+                newZ < -HALF_GRID || newZ >= HALF_GRID ||
+                snake.some(seg => seg.x === newX && seg.z === newZ)
+            ) {
+                isGameOver = true;
+                document.getElementById('gameover').style.display = 'block';
+                return;
+            }
+
+            // Зміна матеріалу старої голови на тіло
+            head.mesh.material = bodyMat;
+            const newHead = createSegment(newX, newZ, true);
+            snake.unshift(newHead);
+
+            // Перевірка поїдання їжі
+            if (newX === foodPos.x && newZ === foodPos.z) {
+                score += 10;
+                document.getElementById('score').innerText = score;
+                spawnFood();
+            } else {
+                const tail = snake.pop();
+                scene.remove(tail.mesh);
+            }
+        }
+
+        function animate(time) {
+            requestAnimationFrame(animate);
+
+            if (time - lastMoveTime > MOVE_INTERVAL) {
+                updateGame();
+                lastMoveTime = time;
+            }
+
+            // Легка анімація обертання їжі
+            if (foodMesh) foodMesh.rotation.y += 0.05;
+
+            renderer.render(scene, camera);
+        }
+
+        resetGame();
+        animate(0);
+    </script>
+</body>
+
+</html>

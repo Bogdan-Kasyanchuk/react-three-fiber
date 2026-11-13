@@ -1,8 +1,9 @@
-import Boxes from "./components/Boxes";
-import Game from "./components/Game";
-import GameDice from "./components/GameDice";
-import Mesh from "./components/Mesh";
-import Tour from "./components/Tour";
+// import Boxes from "./components/Boxes";
+// import Game from "./components/Game";
+// import GameDice from "./components/GameDice";
+// import Mesh from "./components/Mesh";
+// import Tour from "./components/Tour";
+import SnakeGame from "./components/SnakeGame";
 
 export default function App() {
     return (
@@ -10,8 +11,9 @@ export default function App() {
             {/* <Tour /> */}
             {/* <Boxes /> */}
             {/* <Mesh /> */}
-            <Game />
+            {/* <Game /> */}
             {/* <GameDice /> */}
+            <SnakeGame />
         </>
     )
 }
